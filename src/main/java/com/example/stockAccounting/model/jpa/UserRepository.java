@@ -1,4 +1,4 @@
-package com.example.stockAccounting.model;
+package com.example.stockAccounting.model.jpa;
 
 import org.springframework.data.repository.CrudRepository;
 

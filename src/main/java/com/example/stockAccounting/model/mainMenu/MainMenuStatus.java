@@ -1,0 +1,35 @@
+package com.example.stockAccounting.model.mainMenu;
+
+public enum MainMenuStatus {
+
+    FREE,
+    //BUILD_OBJECT:
+
+    BUILD_OBJECT_MAIN,
+
+    BUILD_OBJECT_SHOW_ALL,
+
+
+    BUILD_OBJECT_DOWNLOAD_ALL,
+
+    BUILD_OBJECT_ADD,
+
+    BUILD_OBJECT_WAIT_OBJECT_NAME,
+
+    //STOCK:
+    STOCK_MAIN,
+
+    STOCK_SHOW,
+    STOCK_DOWNLOAD_ALL,
+    STOCK_ADD,
+
+    STOCK_WAIT_MATERIAL,
+
+    STOCK_WAIT_MATERIAL_CNT,
+
+    //CONSUMP:
+    CONSUMP_WAIT_OBJECT,
+    CONSUMP_WAIT_MATERIAL,
+
+    CONSUMP_WAIT_MATERIAL_CNT
+}
