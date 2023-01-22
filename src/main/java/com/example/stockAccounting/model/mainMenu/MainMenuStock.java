@@ -1,7 +1,7 @@
 package com.example.stockAccounting.model.mainMenu;
 
+import com.example.stockAccounting.enums.State;
 import com.example.stockAccounting.model.jpa.*;
-import com.example.stockAccounting.service.ButtonService;
 import com.example.stockAccounting.service.ExcelService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,19 +12,14 @@ import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
-import static com.example.stockAccounting.model.mainMenu.MainMenuStatus.*;
+import static com.example.stockAccounting.enums.State.*;
 
 @Component
 @Slf4j
-public class MainMenuStock implements MainMenuActivity {
+public class MainMenuStock extends MainMenu {
 
     final String MENU_NAME = "/stock";
 
@@ -32,47 +27,32 @@ public class MainMenuStock implements MainMenuActivity {
     private StockRepository stockRepository;
 
     @Autowired
-    private ButtonService buttonService;
-    @Autowired
     private MaterialRepository materialRepository;
-    private MainMenuStatus mainMenuStatus = MainMenuStatus.FREE;
+
+    private Map<User, Material> materialTmp = new HashMap<>();
 
     @Override
-    public String getMenuName() {
-        return MENU_NAME;
-    }
-
-    @Override
-    public String getDescription() {
-        return "База";
-    }
-
-    @Autowired
-    ExcelService excelService;
-    private HashMap<String, String> btnsMaterial = new HashMap<>();
-    private Material materialTmp;
-
-    @Override
-    public PartialBotApiMethod menuRun(Update update) {
+    public PartialBotApiMethod menuRun(User user, Update update) {
         PartialBotApiMethod answer = null;
-        switch (mainMenuStatus) {
+        State state = stateService.getState(user);
+        switch (state) {
             case FREE:
-                answer = freeLogic(update);
+                answer = freeLogic(user, update);
                 break;
             case STOCK_MAIN:
-                answer = stockMainLogic(update);
+                answer = stockMainLogic(user, update);
                 break;
             case STOCK_WAIT_MATERIAL:
-                answer = stockWaitMaterialLogic(update);
+                answer = stockWaitMaterialLogic(user, update);
                 break;
             case STOCK_WAIT_MATERIAL_CNT:
-                answer = stockWaitMaterialCntLogic(update);
+                answer = stockWaitMaterialCntLogic(user, update);
                 break;
         }
         return answer;
     }
 
-    private BotApiMethod freeLogic(Update update) {
+    private BotApiMethod freeLogic(User user, Update update) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(String.valueOf(update.getMessage().getChatId()));
         sendMessage.setText("Выберите режим работы с Базой:");
@@ -83,11 +63,11 @@ public class MainMenuStock implements MainMenuActivity {
         btns.put(String.valueOf(STOCK_ADD), "Добавить материал");
         sendMessage.setReplyMarkup(buttonService.createVerticalMenu(btns));
 
-        mainMenuStatus = MainMenuStatus.STOCK_MAIN;
+        stateService.setState(user, State.STOCK_MAIN);
         return sendMessage;
     }
 
-    private PartialBotApiMethod stockMainLogic(Update update) {
+    private PartialBotApiMethod stockMainLogic(User user, Update update) {
         EditMessageText editMessageText = new EditMessageText();
         if (update.hasCallbackQuery()) {
             String callBackData = update.getCallbackQuery().getData();
@@ -97,16 +77,16 @@ public class MainMenuStock implements MainMenuActivity {
             if (callBackData.equals(String.valueOf(STOCK_DOWNLOAD_ALL))) {
                 List<Stock> stockList = (List<Stock>) stockRepository.findAll();
                 List<List<String>> excelData = new ArrayList<>();
-                excelData.add(Arrays.asList("№","Материал:","Количество"));
+                excelData.add(Arrays.asList("№", "Материал:", "Количество"));
                 for (int i = 0; i < stockList.size(); ++i) {
                     excelData.add(Arrays.asList(String.valueOf(i + 1)
-                                    , stockList.get(i).getMaterial().getName()
-                                    , String.valueOf(stockList.get(i).getCnt()).replace(".", ",")));
+                            , stockList.get(i).getMaterial().getName()
+                            , String.valueOf(stockList.get(i).getCnt()).replace(".", ",")));
                 }
                 SendDocument sendDocument = new SendDocument();
                 sendDocument.setDocument(excelService.createExcelDocument("Склад", excelData));
                 sendDocument.setChatId(String.valueOf(chatId));
-                mainMenuStatus = MainMenuStatus.FREE;
+                stateService.setState(user, State.FREE);
                 return sendDocument;
             }
             if (callBackData.equals(String.valueOf(STOCK_SHOW))) {
@@ -120,7 +100,7 @@ public class MainMenuStock implements MainMenuActivity {
                             .append(stockList.get(i).getCnt()).append("\r\n");
                 }
                 editMessageText.setText(buildObjects.toString());
-                mainMenuStatus = MainMenuStatus.FREE;
+                stateService.setState(user, State.FREE);
             } else if (callBackData.equals(String.valueOf(STOCK_ADD))) {
                 editMessageText.setChatId(String.valueOf(chatId));
                 editMessageText.setMessageId((int) messageId);
@@ -128,41 +108,50 @@ public class MainMenuStock implements MainMenuActivity {
                         "выберите материал:");
 
                 List<Material> materialList = (List<Material>) materialRepository.findAll();
-                btnsMaterial.clear();
+                HashMap<String, String> btnsMaterial = new HashMap<>();
                 for (int i = 0; i < materialList.size(); ++i) {
                     btnsMaterial.put(materialList.get(i).getMaterialId().toString(), materialList.get(i).getName());
                 }
                 editMessageText.setReplyMarkup(buttonService.createVerticalMenu(btnsMaterial));
-                mainMenuStatus = MainMenuStatus.STOCK_WAIT_MATERIAL;
+                stateService.setState(user, State.STOCK_WAIT_MATERIAL);
             }
         }
         return editMessageText;
     }
-    private BotApiMethod stockWaitMaterialLogic(Update update) {
+
+    private BotApiMethod stockWaitMaterialLogic(User user, Update update) {
         EditMessageText editMessageText = new EditMessageText();
         if (update.hasCallbackQuery()) {
             long messageId = update.getCallbackQuery().getMessage().getMessageId();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
             editMessageText.setChatId(String.valueOf(chatId));
             editMessageText.setMessageId((int) messageId);
-
-            materialTmp = materialRepository.findById(Long.parseLong(update.getCallbackQuery().getData())).orElse(null);
-            mainMenuStatus = MainMenuStatus.STOCK_WAIT_MATERIAL_CNT;
+            materialTmp.put(user, materialRepository.findById(Long.parseLong(update.getCallbackQuery().getData())).get());
+            stateService.setState(user, State.STOCK_WAIT_MATERIAL_CNT);
             editMessageText.setText("Введите количество:\n");
         }
         return editMessageText;
     }
-    private BotApiMethod stockWaitMaterialCntLogic(Update update) {
+
+    private BotApiMethod stockWaitMaterialCntLogic(User user, Update update) {
         Stock stock = new Stock();
-        stock.setMaterial(materialTmp);
+        stock.setMaterial(materialTmp.get(user));
         stock.setCnt(Double.parseDouble(update.getMessage().getText()));
-        mainMenuStatus = MainMenuStatus.FREE;
+        stateService.setState(user, State.FREE);
         String chatId = String.valueOf(update.getMessage().getChatId());
         stockRepository.save(stock);
+        materialTmp.remove(user);
         return new SendMessage(chatId, "Новая поставка успешно сохранена: " + stock.getMaterial().getName() + " " + stock.getCnt());
     }
-    public MainMenuStatus getStatus() {
-        return mainMenuStatus;
+
+    @Override
+    public String getMenuName() {
+        return MENU_NAME;
+    }
+
+    @Override
+    public String getDescription() {
+        return "База";
     }
 
 }

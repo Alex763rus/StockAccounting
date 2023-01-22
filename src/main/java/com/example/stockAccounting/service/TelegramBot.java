@@ -1,8 +1,8 @@
 package com.example.stockAccounting.service;
 
 import com.example.stockAccounting.config.BotConfig;
-import com.example.stockAccounting.model.jpa.Stock;
-import com.example.stockAccounting.model.mainMenu.MainMenuStatus;
+import com.example.stockAccounting.model.jpa.User;
+import com.example.stockAccounting.service.database.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,6 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.annotation.PostConstruct;
-import java.util.List;
 
 
 @Component
@@ -30,6 +29,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private MainMenuService mainMenuService;
+
+    @Autowired
+    private UserService userService;
 
     @PostConstruct
     public void init() {
@@ -53,19 +55,27 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage() || update.hasCallbackQuery()) {
-            PartialBotApiMethod answer = mainMenuService.mainMenuRun(update);
-            try {
-                if (answer instanceof BotApiMethod) {
-                    execute((BotApiMethod) answer);
-                }
-                if (answer instanceof SendDocument) {
-                    deleteLastMessage(update);
-                    execute((SendDocument) answer);
-                }
-            } catch (TelegramApiException e) {
-                log.error("Error occurred: " + e.getMessage());
+        User user = null;
+        PartialBotApiMethod answer;
+        if (update.hasMessage()) {
+            user = userService.getUser(update.getMessage());
+        } else if (update.hasCallbackQuery()) {
+            user = userService.getUser(update.getCallbackQuery().getMessage());
+        } else {
+            log.warn("Сообщение не содержит текста и нажатия на кнопку...");
+            return;
+        }
+        answer = mainMenuService.messageProcess(user, update);
+        try {
+            if (answer instanceof BotApiMethod) {
+                execute((BotApiMethod) answer);
             }
+            if (answer instanceof SendDocument) {
+                deleteLastMessage(update);
+                execute((SendDocument) answer);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Ошибка во время обработки сообщения: " + e.getMessage());
         }
     }
 

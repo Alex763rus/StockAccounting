@@ -1,5 +1,6 @@
 package com.example.stockAccounting.model.mainMenu;
 
+import com.example.stockAccounting.model.jpa.User;
 import com.example.stockAccounting.service.database.UserService;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
@@ -10,12 +11,9 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 
 @Component
 @Slf4j
-public class MainMenuStart implements MainMenuActivity{
+public class MainMenuStart extends MainMenu {
 
     final String MENU_NAME = "/start";
-
-    @Autowired
-    private UserService userService;
 
     @Override
     public String getMenuName() {
@@ -23,13 +21,9 @@ public class MainMenuStart implements MainMenuActivity{
     }
 
     @Override
-    public SendMessage menuRun(Update update) {
-        userService.registeredUser(update.getMessage());
-        String userName = update.getMessage().getChat().getFirstName();
-        log.info("Replied to user " + userName);
-        String answer = EmojiParser.parseToUnicode("Hello, " + userName + "!" + " :blush:");
-        String chatId = String.valueOf(update.getMessage().getChatId());
-        return new SendMessage(chatId,  answer);
+    public SendMessage menuRun(User user, Update update) {
+        String answer = EmojiParser.parseToUnicode("Hello, " + user.getFirstName() + "!" + " :blush:");
+        return new SendMessage(user.getChatId().toString(),  answer);
     }
 
     @Override

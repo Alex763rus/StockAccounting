@@ -1,5 +1,6 @@
 package com.example.stockAccounting.model.mainMenu;
 
+import com.example.stockAccounting.model.jpa.User;
 import com.example.stockAccounting.service.ExcelService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
@@ -25,7 +26,7 @@ import java.util.List;
 
 @Component
 @Slf4j
-public class MainMenuDefault implements MainMenuActivity {
+public class MainMenuDefault extends MainMenu {
 
     final String MENU_NAME = "/default";
 
@@ -35,9 +36,8 @@ public class MainMenuDefault implements MainMenuActivity {
     }
 
     @Override
-    public PartialBotApiMethod menuRun(Update update) {
+    public PartialBotApiMethod menuRun(User user, Update update) {
         String chatId = String.valueOf(update.getMessage().getChatId());
-
         String command = update.getMessage().getText();
         return new SendMessage(chatId, "..!.. Not a found command with name: " + command);
     }

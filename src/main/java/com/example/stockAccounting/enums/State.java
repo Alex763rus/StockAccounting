@@ -1,6 +1,6 @@
-package com.example.stockAccounting.model.mainMenu;
+package com.example.stockAccounting.enums;
 
-public enum MainMenuStatus {
+public enum State {
 
     FREE,
     //BUILD_OBJECT:
